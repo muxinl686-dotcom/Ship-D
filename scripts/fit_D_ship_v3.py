@@ -9,7 +9,6 @@ import csv
 import sys
 import numpy as np
 from scipy.optimize import minimize
-from scipy.spatial import cKDTree
 from stl import mesh
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,7 +71,6 @@ count=0
 
 def measure(verts):
     # Slice with a narrow X band. Nearest sample X-slice must lie within tolerance.
-    tree=cKDTree(verts[:,[0]])
     # nearest-X vertices may only belong to surface; measure full ring in an X slab
     xvals=verts[:,0]
     widths=np.empty(len(positions))
@@ -113,7 +111,10 @@ def objective(x):
         mins=verts.min(axis=0); maxs=verts.max(axis=0)
         dims=maxs-mins
         # STL axes verified as X longitudinal, Y transverse, Z vertical.
-        verts=verts-mins
+        # STL is centered transversely at Y=0: never shift Y by its minimum!
+        # Only longitudinal origin and vertical bbox datum are translated.
+        verts[:,0] -= mins[0]
+        verts[:,2] -= mins[2]
         hw,zmin=measure(verts)
         werr=float(np.sqrt(np.mean((hw-target_hw)**2)))
         zerr=float(np.sqrt(np.mean((zmin-target_z)**2)))
@@ -133,7 +134,7 @@ def objective(x):
     history.append([count,status,loss,werr,zerr,dimerr,*np.asarray(x)])
     return loss
 
-print("开始纵向半宽/最低点高度联合拟合",flush=True)
+print("开始纵向半宽/最低点高度联合拟合（已修复横向中心线Y=0）",flush=True)
 initial=objective(x0)
 if initial>=100:
     print("v2种子在v3检查下无效，尝试随机寻找可行参数",flush=True)
@@ -150,8 +151,10 @@ if initial>=100:
             w.writerows(history)
         raise SystemExit("未找到可行初值，详细原因见fitting_history_v3.csv")
 
-minimize(objective,x0,method="Powell",bounds=BOUNDS,
+result=minimize(objective,x0,method="Powell",bounds=BOUNDS,
          options={"maxfev":120,"maxiter":10,"xtol":.04,"ftol":.015,"disp":True})
+if result.fun >= 100 and np.isfinite(best["value"]):
+    print("提示：Powell 最后一个候选不可行；采用历史最优有效方案，而非最终迭代点。",flush=True)
 
 with (OUT/"fitting_history_v3.csv").open("w",newline="") as f:
     w=csv.writer(f)
