@@ -32,3 +32,13 @@ python Hydrofoil-Hull-Generator/reconstruct_hull.py
 周长等分采样可能减弱折角，下一版本需要按 CAD 交线拓扑识别并保留龙骨、折角线及舷侧连接点，直接利用 STEP CAD 面实现完整端部与分片 CAD 曲面构建。
 
 本项目以方法借鉴为主，未复制 Ship-D 源代码。
+
+## V0.2 特征边分片验证
+
+运行 `python Hydrofoil-Hull-Generator/reconstruct_hull_v02.py`。
+
+这版只选择原始 CSV 中连续的 **11 段 CAD 交线拓扑区域**（预期为 53 个截面）。将右半剖面从龙骨中心到甲板中心的 6 段 CAD 边逐段离散，并保持段端点在所有截面占据同一网格列，避免 V0.1 的全周长均匀重采样跨折角错位。
+
+输出目录：`output/hydrofoil_hull_generator/v02/`，包含 `D_ship_feature_region_v02.stl`、`feature_lines.csv` 和 `geometry_report_v02.json`。如果 CAD 边无法按 0.1 mm 容差连接或段数不符，程序主动停止并输出 `failed_sections.csv`，不生成错误连接的 STL。
+
+**重要：V0.2 仅验证同拓扑区域的特征线连续性，端面仍为人工封口；这不等于整艇重构、明确折角类型识别或 STEP CAD 曲面输出。**
