@@ -62,6 +62,19 @@ KEYS=np.array([1,2,7,8,27,28])
 BOUNDS=[(.12,.72),(.12,.72),(.18,.37),(12.,28.),(12.,28.),(.18,.37)]
 X0=np.array([base[1],base[2],2.1/L,20.,19.,2.0/L])
 X0=np.clip(X0,[a+1e-4 for a,b in BOUNDS],[b-1e-4 for a,b in BOUNDS])
+# Start from v1's geometrically feasible parameters if available. V1 used the
+# sampled-section bbox incorrectly; we copy only shape variables, not dimensions.
+v1_seed=ROOT/"output"/"fitting"/"D_ship_best_parameters.csv"
+if v1_seed.exists():
+    try:
+        prev=np.loadtxt(v1_seed,delimiter=",").reshape(-1)
+        if prev.size>=45:
+            X0=np.clip(prev[KEYS],[a+1e-4 for a,b in BOUNDS],
+                       [b-1e-4 for a,b in BOUNDS])
+            print("使用v1候选的形状参数作为v2初值（主尺度仍采用STEP真实数据）",flush=True)
+    except Exception as exc:
+        print("读取v1参数失败:",repr(exc),flush=True)
+
 TEMP=OUT/"_candidate"
 best={"score":np.inf}
 history=[]
@@ -78,8 +91,12 @@ def score(x):
             raise ValueError("参数超出范围")
         hull=HP(p)
         constraints=np.asarray(hull.input_Constraints(),dtype=float)
-        if not np.isfinite(constraints).all() or np.any(constraints>1e-8):
-            raise ValueError("不满足Ship-D几何约束")
+        if not np.isfinite(constraints).all():
+            raise ValueError("Ship-D几何约束出现NaN/Inf")
+        if np.any(constraints>1e-8):
+            bad=np.where(constraints>1e-8)[0]
+            details=", ".join(f"{int(i)}:{constraints[i]:.5g}" for i in bad[:8])
+            raise ValueError(f"约束超限 {len(bad)}项, 序号:数值={details}")
         hull.gen_stl(NUM_WL=35,PointsPerWL=140,
                      bit_AddTransom=1,bit_AddDeckLid=1,namepath=str(TEMP))
         verts=mesh.Mesh.from_file(str(TEMP)+".stl").vectors.reshape(-1,3)
@@ -112,12 +129,36 @@ def score(x):
         section_rmse=np.nan
         dim_err=np.array([np.nan]*3)
         orientation=-1
+    if status!="OK" and (eval_counter<=6 or eval_counter%10==0):
+        print(f"候选#{eval_counter}无效: {status}",flush=True)
     history.append([eval_counter,status,total,section_rmse,
                     *dim_err,orientation,*x])
     return total
 
 print("开始v2六参数拟合：先保证真实主尺度，再降低截面近似误差",flush=True)
 start=score(X0)
+if start>=100:
+    print("初始候选无效；随机搜索可行的几何参数...",flush=True)
+    random=np.random.default_rng(2025)
+    feasible=[]
+    for trial in range(100):
+        x=np.array([random.uniform(a,b) for a,b in BOUNDS])
+        v=score(x)
+        if v<100:
+            feasible.append((v,x.copy()))
+            if len(feasible)>=5: break
+    if feasible:
+        X0=min(feasible,key=lambda t:t[0])[1]
+        print(f"已找到{len(feasible)}个可行初值，开始局部优化",flush=True)
+    else:
+        print("随机搜索也未找到可行候选；脚本将停止，保留约束失败记录。",flush=True)
+        with (OUT/"fitting_history_v2.csv").open("w",newline="") as f:
+            writer=csv.writer(f)
+            writer.writerow(["evaluation","status","objective_m","sampled_rmse_m",
+                  "length_err_m","beam_err_m","height_err_m","reverse_x",
+                  "p1","p2","p7","p8","p27","p28"])
+            writer.writerows(history)
+        raise SystemExit("无可行候选：查看fitting_history_v2.csv的status列")
 result=minimize(score,X0,method="Powell",bounds=BOUNDS,
                 options={"maxfev":90,"maxiter":8,"xtol":0.05,"ftol":0.01,"disp":True})
 with (OUT/"fitting_history_v2.csv").open("w",newline="") as f:
