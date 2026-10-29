@@ -42,3 +42,17 @@ python Hydrofoil-Hull-Generator/reconstruct_hull.py
 输出目录：`output/hydrofoil_hull_generator/v02/`，包含 `D_ship_feature_region_v02.stl`、`feature_lines.csv` 和 `geometry_report_v02.json`。如果 CAD 边无法按 0.1 mm 容差连接或段数不符，程序主动停止并输出 `failed_sections.csv`，不生成错误连接的 STL。
 
 **重要：V0.2 仅验证同拓扑区域的特征线连续性，端面仍为人工封口；这不等于整艇重构、明确折角类型识别或 STEP CAD 曲面输出。**
+
+## 参数化基础模块（新增）
+
+- `extract_features.py`：读取原始 CAD 横剖面交线，生成 `section_geometry.csv`（各站位宽度、高度与中心线范围）、`corner_candidates.csv`（按 CAD 边端点夹角初筛的**未确认**转折候选点）和 `feature_report.json`。**不能将候选点直接称为主折角线或龙骨线。**
+- `hull_parameters.py`：定义纯艇体主尺度、纵向龙骨控制、折角半宽比例、斜升角、艏艉与舷侧形状等参数，执行基础范围检查，输出 JSON 参数模板；尚未连接曲面生成器。
+
+在仓库根目录执行：
+
+```bash
+python Hydrofoil-Hull-Generator/extract_features.py
+python Hydrofoil-Hull-Generator/hull_parameters.py
+```
+
+输出分别位于 `output/hydrofoil_hull_generator/features/` 和 `output/hydrofoil_hull_generator/parameters/`。斜升角默认值仅为设计初值，不是从原始 STEP 测量得到的值；型深/吃水与外包围盒高度不可混同。
