@@ -12,9 +12,10 @@ import csv
 import sys
 import numpy as np
 from stl import mesh
-from HullParameterization import Hull_Parameterization as HP
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from HullParameterization import Hull_Parameterization as HP
 OUT = ROOT / "output" / "fitting_v3b"
 OUT.mkdir(parents=True, exist_ok=True)
 
