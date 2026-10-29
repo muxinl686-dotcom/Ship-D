@@ -56,3 +56,17 @@ python Hydrofoil-Hull-Generator/hull_parameters.py
 ```
 
 输出分别位于 `output/hydrofoil_hull_generator/features/` 和 `output/hydrofoil_hull_generator/parameters/`。斜升角默认值仅为设计初值，不是从原始 STEP 测量得到的值；型深/吃水与外包围盒高度不可混同。
+
+## V0.3 参数驱动的局部艇体生成（新）
+
+先运行 V0.2 获取拓扑对应的局部参考网格：
+
+```bash
+python Hydrofoil-Hull-Generator/reconstruct_hull_v02.py
+python Hydrofoil-Hull-Generator/generate_parametric_hull.py
+python Hydrofoil-Hull-Generator/generate_parametric_hull.py --demo --name D_ship_demo_v03
+```
+
+还可传入 `--config output/hydrofoil_hull_generator/parameters/D_ship_parameter_schema_v01.json`，读取参数模板。生成结果保存于 `output/hydrofoil_hull_generator/parametric/`，包括 STL、特征节点 CSV 和报告 JSON。
+
+**当前真正生效的参数**：L/B/几何高度、艏中艉三个横向整体宽度比例、艏中艉三个截面整体高程偏移。**尚未生效**：斜升角、独立折角宽度、艏部形状、艉封板和舷侧外倾等字段。当前名称中保留 chine/keel 只是参数框架的暂定名称，实际算法尚不是对真实折角线/龙骨线的独立控制。V0.3 只输出 V0.2 的同拓扑局部区域，并不是整艇生成。不要用于 CFD；需要先验证 V0.2 是否可用以及硬折角特征是否正确。
